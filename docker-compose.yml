@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Backend server
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mev-detector-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
+      - ALCHEMY_ENDPOINT_MAINNET=${ALCHEMY_ENDPOINT_MAINNET}
+      - ALCHEMY_ENDPOINT_SEPOLIA=${ALCHEMY_ENDPOINT_SEPOLIA}
+      - FLASHBOTS_RELAY_URL=https://relay.flashbots.net
+      - FLASHBOTS_PROTECT_RPC=https://protected.flashbots.net
+      - PORT=5000
+      - NETWORK=sepolia
+    volumes:
+      - ./server/src:/app/src
+    restart: unless-stopped
+
+  # Frontend app
+  frontend:
+    build:
+      context: ./mev-detector
+      dockerfile: Dockerfile
+    container_name: mev-detector-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_WS_URL=ws://localhost:5000
+      - REACT_APP_NETWORK=sepolia
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: mev-detector-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mev-detector-data:
+
+networks:
+  default:
+    name: mev-detector-network
